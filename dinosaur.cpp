@@ -515,7 +515,7 @@ public:
 		dino = new Dinosaur(map_height - Dinosaur::height - 3, 10);
 	
 		obs_list.clear();
-		for (int i = 0; i < 10; i++) {
+		for (int i = 0; i < 20; i++) {
 
 			string asset;
 			int type = rand() % 4 + 1;
@@ -532,6 +532,7 @@ public:
 
 		Render();
 		mvaddstr(map_height / 2 - 3, map_width / 2 - 8, "NO INTERNET");
+		mvaddstr(map_height / 2 - 2, map_width / 2 -  12, "Press space to play");
 		
 		char key = getch();
 		while (key != ' ') {
@@ -561,6 +562,8 @@ public:
 			for (Obstacle *obs: obs_list) obs->Move();
 			Render();
 			mvaddstr(map_height / 2 - 3, map_width / 2 - 6, "GAME OVER");
+			mvaddstr(map_height / 2 - 2, map_width / 2 - 12, "Press space to replay");
+			mvaddstr(map_height / 2 - 1, map_width / 2 - 9,  "Press Q to quit");
 			ofstream out; out.open("highscore.txt");
 			out << highscore;
 			char key;
