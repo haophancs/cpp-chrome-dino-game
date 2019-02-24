@@ -542,7 +542,7 @@ public:
 		} 
 		dino->Start();	
 		time(&t_start);
-		nodelay(stdscr, TRUE);
+		difficult = 1;
 		isStarted = true;
 	}
 
