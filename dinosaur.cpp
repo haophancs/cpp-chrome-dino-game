@@ -17,7 +17,14 @@ struct Coord {
 	
 		return this->x == other.x && this->y == other.y;
 	}
+	Coord() {};
+	Coord(int y, int x) {
+	
+		this->y = y;
+		this->x = x;
+	}
 };
+
 
 class AssetReader {
 
@@ -25,32 +32,43 @@ private:
 	ifstream in;
 
 public:
-
-	void readFileWithUnknownSize(vector<string> &ls, string file) {
+	void readFileWithUnknownSize(vector<vector<char>> &ls, string file, int &height, int &width) {
 
 		in.open(file);
-		int height, width;
-		in >> noskipws >> height;
-		in >> noskipws >> width;
-		in.close();
-		readFileIntoVectorString(ls, file, height, width);
-	}
-	void readFileIntoVectorString(vector<string> &ls, string file, int height, int width) {
-	
-		in.open(file);
+		in >> height;
+		in >> width;
 		ls.clear();
 		ls.resize(height);
-		string s = "";
+		vector<char> s;
 		char c;
 		for (int i = 0; i < (int)ls.size(); i++) {
 		
 			for (int j = 0; j < width; j++) {
 			
 				in >> noskipws >> c;
-				s += c;
+				s.push_back(c);
 			}	
 			ls[i] = s;
-			s = "";
+			s.clear();
+		}
+		in.close();
+	}
+	void readFileIntoVectorString(vector<vector<char>> &ls, string file, int height, int width) {
+	
+		in.open(file);
+		ls.clear();
+		ls.resize(height);
+		vector<char> s;
+		char c;
+		for (int i = 0; i < (int)ls.size(); i++) {
+		
+			for (int j = 0; j < width; j++) {
+			
+				in >> noskipws >> c;
+				s.push_back(c);
+			}	
+			ls[i] = s;
+			s.clear();
 		}
 		in.close();
 	}
@@ -58,15 +76,13 @@ public:
 
 class Dinosaur {
 
-public:
-	static const int height = 9, width = 16;
 private:
 	Coord pivot;
 	Coord org_pivot;
-	vector<string> body_idle;
-	vector<string> body_run1;
-	vector<string> body_run2;
-	vector<string> body;
+	vector<vector<char>> body_idle;
+	vector<vector<char>> body_run1;
+	vector<vector<char>> body_run2;
+	vector<vector<char>> body;
 
 	const string asset_idle = "dino_idle.txt";
 	const string asset_run1 = "dino_run1.txt";
@@ -85,12 +101,12 @@ private:
 	}
 
 public:
-
 	static const int IDLE_STATE = 100;
 	static const int RUN1_STATE = 111;
 	static const int RUN2_STATE = 122;
 	static const int JUMP_STATE = 133;
 	static const int FALL_STATE = 144;
+	static const int height = 9, width = 16;
 	bool start = true;
 
 	Dinosaur(int y, int x) {
@@ -107,6 +123,7 @@ public:
 	
 		return this->pivot;
 	}
+	
 	void setPivotY(int y) {
 	
 		this->pivot.y = y;
@@ -140,7 +157,8 @@ public:
 
 	void Jump() {
 
-		if (this->state_code != FALL_STATE && this->state_code != JUMP_STATE) setStateCode(JUMP_STATE), on_space = 0;
+		if (this->state_code != FALL_STATE && this->state_code != JUMP_STATE) 
+			setStateCode(JUMP_STATE), on_space = 0;
 	}
 	
 	void Rise() {
@@ -196,42 +214,49 @@ public:
 	void Draw() {
 	
 		for (int i = 0; i < height; i++) {
-		
-			mvaddstr(pivot.y + i, pivot.x, const_cast<char *>(body[i].c_str()));
+	
+			for (int j = 0; j < width; j++) {
+			
+				mvaddch(pivot.y + i, pivot.x + j, body[i][j]);
+			}
 		}
 	}
 
-	vector<string> getBody() {
+	vector<vector<char>> getBody() {
 	
 		return this->body;
-	}
+	}	
 };
 
 class Obstacle {
 
 private:
-	vector<string> body;
+	vector<vector<char>> body;
 	string asset_file;
 	Coord pivot;
 	int height, width;
+	int map_height, map_width;
 
 	void readAssetFile() {
 	
 		AssetReader assetReader;
-		assetReader.readFileIntoVectorString(body, asset_file, height, width);
+		assetReader.readFileWithUnknownSize(body, asset_file, height, width);
 	}
 
 public:
 
 	Obstacle();
-	Obstacle(string asset_file, int x, int y) {
-	
+	Obstacle(string asset_file, int map_height, int map_width, int org_x) {
+
+		this->map_height = map_height;
+		this->map_width = map_width;
 		this->asset_file = asset_file;
-		this->pivot.x = x;
-		this->pivot.y = y;
+		this->pivot.x = org_x;
+		readAssetFile();
+		this->pivot.y = map_height - height - 3;
 	}
 	
-	string getAssetFile() {
+	string getAssetFileName() {
 	
 		return this->asset_file;
 	}
@@ -239,7 +264,34 @@ public:
 	
 		this->asset_file = file;
 	}
-	vector<string> getBody() {
+	Coord getPivot() {
+	
+		return this->pivot;
+	}
+	void setPivotX(int x) {
+	
+		this->pivot.x = x;
+	}
+
+	int getHeight() {
+	
+		return this->height;
+	}
+	int getWidth() {
+	
+		return this->width;
+	}
+	bool Move() {
+
+		pivot.x--;
+		if (pivot.x + width - 1 <= 0) return true;
+		return false;
+	}
+	bool insideMap(int i, int j) {
+
+		return pivot.y + i < map_height && pivot.y + i >= 0 && pivot.x + j < map_width && pivot.x + j >= 0;
+	}
+	vector<vector<char>> getBody() {
 	
 		return this->body;
 	}
@@ -249,55 +301,60 @@ class Land {
 
 public:
 	int length;
-	string layer0;
-	string layer1;
-	string layer2;
+	bool start;
+	string layer0, layer0p;
+	string layer1, layer1p;
+	string layer2, layer2p;
 	
 	int pos_line;
 	int curr = 1;
 
-public:
+	void createDotLayer(string &layer, int len, double spawn_rate) {
+	
+		int dot_count = len * spawn_rate;
+		int c = 0;
+		layer = "";
+		for (int i = 0; i < len; i++) {
+		
+			int rd = rand() % 8;
+			layer += (rd == 0 && c < dot_count)? ".":" ";
+			c += rd == 0;
+		}
+	}
 
-	void makeLayer(bool df = true, int dfl = 10){
+	void createFloor(string &layer, int len) {
+	
+		layer = "";
+		int odd_count = 2;
+		int c = 0;
+		for (int i = 0; i < len; i++) { 
+			int rd = rand() % 40;
+			layer += (c < odd_count && rd == 0)? "^": "=";
+			c += rd == 0;
+		}
+	}
+
+public:
+	void makeAllLayer(bool df = true, int dfl = 10){
 
 		if (df) dfl = length;
 
-		layer0 = "";
-		int odd_count = 2;
-		int c = 0;
-		for (int i = 0; i < dfl; i++) { 
-			int rd = rand() % 40;
-			layer0 += (c < odd_count && rd == 0)? "^": "=";
-			c += rd == 0;
-		}
+		createFloor(layer0, dfl);
+		createFloor(layer0p, dfl * 2);
 
-		int dot_count = dfl / 6;
-		layer1 = "";
-		layer2 = "";
-		for (int i = 0; i < dfl; i++) {
-		
-			int rd = rand() % 8;
-			layer1 += (rd == 0 && c < dot_count)? ".":" ";
-			c += rd == 0;
-		}
-		c = 0;
-		dot_count = dfl / 10;
-		for (int i = 0; i < dfl; i++) {
-		
-			int rd = rand() % 8;
-			layer2 += (rd == 0 && c < dot_count)? ".":" ";
-			c += rd == 0;
-		}
+		createDotLayer(layer1, dfl, dfl / 6.);
+		createDotLayer(layer1p, dfl, dfl / 6.);
+		createDotLayer(layer2, dfl, dfl / 10.);
+		createDotLayer(layer2p, dfl, dfl / 10.);
 	}
 
 	void Move() {
-	
-		if (curr == 2*length) { makeLayer(); curr = 1; }
-		char temp = layer1[0]; layer1 = layer1.substr(1); layer1 += temp;
-		temp = layer2[0]; layer2 = layer2.substr(1); layer2 += temp;
-		temp = layer0[0]; layer0 = layer0.substr(1); layer0 += temp;
-		curr++;	
+
+		layer0 += layer0p[0]; char temp = layer0[0]; layer0 = layer0.substr(1); layer0p = layer0p.substr(1); layer0p = temp + layer0p;
+		layer1 += layer1p[0];      temp = layer1[0]; layer1 = layer1.substr(1); layer1p = layer1p.substr(1); layer1p = temp + layer1p;
+		layer2 += layer2p[0];      temp = layer2[0]; layer2 = layer2.substr(1); layer2p = layer2p.substr(1); layer2p = temp + layer2p;
 	}
+
 	void Draw() {
 	
 		mvaddstr(pos_line, 0, const_cast<char *>(layer0.c_str()));
@@ -312,13 +369,16 @@ public:
 
 	Land() {
 	
-		makeLayer(false, length / 10);
+		makeAllLayer(false, length / 10);
 	}
-	Land(int length, int pos_line) {
+
+	Land(int length, int pos_line, int isStarted) {
 	
 		this->length = length;
 		this->pos_line = pos_line;
-		makeLayer(false, length / 10);
+		this->start = isStarted;
+		if (!isStarted) makeAllLayer(false, length / 10);
+		else makeAllLayer(false, length);
 	}
 };
 
@@ -326,24 +386,25 @@ class GameManager {
 
 private:
 	int map_width, map_height;
-	int highscore = 0;
-	int score = 0;
+	unsigned long long highscore = 0;
+	unsigned long beat = 0;
 
 	Land *land;
 	Dinosaur *dino;
-	vector<Obstacle> obs_list;
+	vector<Obstacle*> obs_list;
+
 	vector<string> map, blank_map; 
 	
 	const string highscore_file = "highscore.txt";
 	bool keyPressed = false;
-	int beat = 0;
-	int difficult = 0;
+	int difficult = 1;
 	int clock = 10000;
 	time_t t_start, t_now;
 
 public:
-
 	bool isGameOver = false;
+	bool isStarted = false;
+	bool isExit = false;
 	GameManager();
 	GameManager(int height, int width) {
 
@@ -358,31 +419,45 @@ public:
 	
 		delete dino;
 		delete land;
+		for (int i = 0; i < (int)obs_list.size(); i++) delete obs_list[i];
 	}
 
 	void changeState() {
 	
 		time(&t_now);
 		land->Move();
+		for (int i = 0; i < (int)obs_list.size(); i++) {
+		
+			if (obs_list.at(i)->Move()) {
+		
+				Obstacle *temp = obs_list.at(i);
+				obs_list.erase(obs_list.begin() + i, obs_list.begin() + i + 1);
+				temp->setPivotX(obs_list.back()->getPivot().x + obs_list.back()->getWidth() + 50 + rand() % (map_width / 2));
+				obs_list.push_back(temp);
+			}
+		}
+		
 		if (beat % 8 == 0) dino->toggleStep();
 		if (beat % 2 == 0) dino->Rise();
 		if (beat % 2 == 0 ) dino->Fall();
 		
-		if (difftime(t_now, t_start) >= 10) {
+		if (difftime(t_now, t_start) + 1 >= 15) {
 			difficult++;
 			difficult = min(8, difficult);
 			time(&t_start);
 		}
 	
-		if (getch() == ' ' && !dino->start) {
-			dino->Jump();
-			
-		}
-		if (dino->start && dino->onRightPos()) land->makeLayer(), dino->start = false;;
-		beat++;
+		char key = getch();
+		if (key == ' ' && !dino->start) dino->Jump();
+		else if (key == 'q') isExit = true;
 
+		if (dino->start && dino->onRightPos()) 
+			land->makeAllLayer(), dino->start = false;;
+
+		beat++;
 		dino->setMaxOnSpace(2 + min(6, difficult));
 		clock = max(2000, 10000 - difficult*800);
+		highscore = (beat / 5 > highscore)? beat / 5 : highscore;
 	}
 
 	void setDifficult(int diff) {
@@ -390,61 +465,114 @@ public:
 		this->difficult = diff;
 	}
 
-	void calcPos() {
-	
+	void Render() {
+
+	    map = blank_map;		
 		for (int j = 0; j < map_width; j++) {
-		
-			map[map_height - 3][j] = land->layer0[j];
-			map[map_height - 2][j] = land->layer1[j];
-			map[map_height - 1][j] = land->layer2[j];
+			
+			map[map_height - 3][j] = (j < (int)land->layer0.length())? land->layer0[j] : ' ';
+			map[map_height - 2][j] = (j < (int)land->layer1.length())? land->layer1[j] : ' ';
+			map[map_height - 1][j] = (j < (int)land->layer2.length())? land->layer2[j] : ' ';
 		}
 
 		for (int i = 0; i < dino->getHeight(); i++) {
 		
 			for (int j = 0; j < dino->getWidth(); j++) {
-			
+	
 				map[dino->getPivot().y + i][dino->getPivot().x + j] = dino->getBody()[i][j];
 			}
 		}
-	} 
-
-	void Render() {
-
-	    map = blank_map;		
-		calcPos();
 		
-		for (int i = 0; i < map_height; i++) {
-			mvaddstr(i, 0, const_cast<char *> (map[i].c_str()));
+		if (isStarted)
+		for (Obstacle *obs : obs_list)
+		for (int i = 0; i < obs->getHeight(); i++) {
+		
+			for (int j = 0; j < obs->getWidth(); j++) {
+			
+				if (obs->insideMap(i, j)) {
+					if (map[obs->getPivot().y + i][obs->getPivot().x + j] == ' ')
+						map[obs->getPivot().y + i][obs->getPivot().x + j] = obs->getBody()[i][j];
+					else if (map[obs->getPivot().y + i][obs->getPivot().x + j] == '=' && obs->getBody()[i][j] != ' ') {
+						isGameOver = true;
+					}
+				}
+			}
 		}
-		if (dino->getStateCode() == Dinosaur::JUMP_STATE) mvaddstr(0, 0, "is rising");
-		else if (dino->getStateCode() == Dinosaur::FALL_STATE) mvaddstr(0, 0, "is falling");
-		move(1, 0); printw("%d", difficult);
+	
+		for (int i = 0; i < map_height; i++) {
+			
+			for (int j = 0; j < map_width; j++) {
+			
+				mvaddch(i, j, map[i][j]);
+			}
+		}
+		mvprintw(1, map_width - 15, "HI:   %d           ", highscore);
+		mvprintw(2, map_width - 15, "CURR: %d           ", beat / 5);
 	}
 
 	void Init() {
 		
 		dino = new Dinosaur(map_height - Dinosaur::height - 3, 10);
-		land = new Land(map_width, map_height);
-		score = 0;
-		isGameOver = true;
+	
+		obs_list.clear();
+		for (int i = 0; i < 10; i++) {
+
+			string asset;
+			int type = rand() % 4 + 1;
+			obs_list.push_back(new Obstacle("cactus" + to_string(type) + ".txt", map_height, map_width, map_width + 100 + 100 * i - rand() % 25));
+			mvprintw(i, 0, "%d     ", obs_list[i]->getPivot().x);
+		}
+
+		land = new Land(map_width, map_height, isStarted);
+		beat = 0;
+		isGameOver = false;
+
+		ifstream in; in.open("highscore.txt");
+		in >> highscore;
 
 		Render();
-		nodelay(stdscr, FALSE);
-		if (getch() == ' ') dino->Start();	
+		mvaddstr(map_height / 2 - 3, map_width / 2 - 8, "NO INTERNET");
+		
+		char key = getch();
+		while (key != ' ') {
+
+			if (key == 'q') endwin(), exit(0);
+			key = getch();
+		} 
+		dino->Start();	
 		time(&t_start);
 		nodelay(stdscr, TRUE);
+		isStarted = true;
 	}
 
 	void Play() {
 		
-		Init();
-		while(true) {
+		while (true) {
+		
+			Init();
+			while(!isGameOver) {
 			
-			Render();	
-			changeState();
-			usleep(clock);
-			refresh();
+				changeState();
+				Render();
+				usleep(clock);
+				refresh();
+				if (isExit) goto Exit;
+			}
+			for (Obstacle *obs: obs_list) obs->Move();
+			Render();
+			mvaddstr(map_height / 2 - 3, map_width / 2 - 6, "GAME OVER");
+			ofstream out; out.open("highscore.txt");
+			out << highscore;
+			char key;
+			while (true) {
+		
+				usleep(20000);
+				key = getch();
+				if (key == ' ') break;
+				else if (key == 'q') goto Exit;
+			}
 		}
+Exit: { }
 	}
 };
 
@@ -459,7 +587,7 @@ int main() {
 	
 	GameManager gameManager(50, 200);
 	gameManager.Play();
-	getch();
+	
 	endwin();
 	return 0;
 }
