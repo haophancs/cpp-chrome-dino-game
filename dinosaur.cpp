@@ -91,6 +91,7 @@ private:
 	int state_code = IDLE_STATE;
 	int on_space = 0;
 	int max_on_space = 2;
+	int jump_height;
 
 	AssetReader assetReader;
 	void readAssetFile() {
@@ -157,17 +158,21 @@ public:
 
 	void Jump() {
 
-		if (this->state_code != FALL_STATE && this->state_code != JUMP_STATE) 
-			setStateCode(JUMP_STATE), on_space = 0;
+
+		if (this->state_code == JUMP_STATE)
+			jump_height = org_pivot.y - height * 2;
+		else if (this->state_code != FALL_STATE && this->state_code != JUMP_STATE) 
+			setStateCode(JUMP_STATE), on_space = 0, jump_height = org_pivot.y - height * 1.4;
+
 	}
 	
 	void Rise() {
 
 		if (this->state_code == JUMP_STATE) {
 		
-			if (pivot.y <= org_pivot.y - height * 2) {
+			if (pivot.y <= jump_height) {
 			
-				pivot.y = org_pivot.y - height * 2;
+				pivot.y = jump_height;
 				if (on_space == max_on_space) this->state_code = FALL_STATE, on_space = 0;
 				else on_space++;
 			}
@@ -439,7 +444,7 @@ public:
 		
 		if (beat % 8 == 0) dino->toggleStep();
 		if (beat % 2 == 0) dino->Rise();
-		if (beat % 2 == 0 ) dino->Fall();
+		if (beat % 2 == 0) dino->Fall();
 		
 		if (difftime(t_now, t_start) + 1 >= 15) {
 			difficult++;
