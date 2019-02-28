@@ -25,54 +25,30 @@ struct Coord {
 	}
 };
 
+void readFileWithUnknownSize(vector<vector<char>> &ls, string file) {
 
-class AssetReader {
-
-private:
 	ifstream in;
+	int height, width;
+	in.open(file);
+	in >> height;
+	in >> width;
 
-public:
-	void readFileWithUnknownSize(vector<vector<char>> &ls, string file, int &height, int &width) {
-
-		in.open(file);
-		in >> height;
-		in >> width;
-		ls.clear();
-		ls.resize(height);
-		vector<char> s;
-		char c;
-		for (int i = 0; i < (int)ls.size(); i++) {
-		
-			for (int j = 0; j < width; j++) {
-			
-				in >> noskipws >> c;
-				s.push_back(c);
-			}	
-			ls[i] = s;
-			s.clear();
-		}
-		in.close();
-	}
-	void readFileIntoVectorString(vector<vector<char>> &ls, string file, int height, int width) {
+	ls.clear();
+	ls.resize(height);
+	vector<char> s;
+	char c;
+	for (int i = 0; i < (int)ls.size(); i++) {
 	
-		in.open(file);
-		ls.clear();
-		ls.resize(height);
-		vector<char> s;
-		char c;
-		for (int i = 0; i < (int)ls.size(); i++) {
+		for (int j = 0; j < width; j++) {
 		
-			for (int j = 0; j < width; j++) {
-			
-				in >> noskipws >> c;
-				s.push_back(c);
-			}	
-			ls[i] = s;
-			s.clear();
-		}
-		in.close();
+			in >> noskipws >> c;
+			s.push_back(c);
+		}	
+		ls[i] = s;
+		s.clear();
 	}
-};
+	in.close();
+}
 
 class Dinosaur {
 
@@ -82,41 +58,43 @@ private:
 	vector<vector<char>> body_idle;
 	vector<vector<char>> body_run1;
 	vector<vector<char>> body_run2;
+	vector<vector<char>> body_crouch;
 	vector<vector<char>> body;
 
-	const string asset_idle = "dino_idle.txt";
-	const string asset_run1 = "dino_run1.txt";
-	const string asset_run2 = "dino_run2.txt";
+	const string asset_idle = "dino_idle.ast";
+	const string asset_run1 = "dino_run1.ast";
+	const string asset_run2 = "dino_run2.ast";
+	const string asset_crouch = "dino_crouch.ast";
 
 	int state_code = IDLE_STATE;
 	int on_space = 0;
 	int max_on_space = 2;
 	int jump_height;
 
-	AssetReader assetReader;
 	void readAssetFile() {
-	
-		assetReader.readFileIntoVectorString(body_idle, asset_idle, height, width);
-		assetReader.readFileIntoVectorString(body_run1, asset_run1, height, width);
-		assetReader.readFileIntoVectorString(body_run2, asset_run2, height, width);
+
+		readFileWithUnknownSize(body_idle, asset_idle);
+		readFileWithUnknownSize(body_run1, asset_run1);
+		readFileWithUnknownSize(body_run2, asset_run2);
+		readFileWithUnknownSize(body_crouch, asset_crouch);
 	}
 
 public:
-	static const int IDLE_STATE = 100;
-	static const int RUN1_STATE = 111;
-	static const int RUN2_STATE = 122;
-	static const int JUMP_STATE = 133;
-	static const int FALL_STATE = 144;
-	static const int height = 9, width = 16;
+	static const int IDLE_STATE   = 100;
+	static const int RUN1_STATE   = 111;
+	static const int RUN2_STATE   = 122;
+	static const int JUMP_STATE   = 133;
+	static const int FALL_STATE   = 144;
+	static const int CROUCH_STATE = 155;
 	bool start = true;
 
 	Dinosaur(int y, int x) {
 	
 		this->pivot.x = x;
-		this->pivot.y = y;
 		readAssetFile();
 		body = body_idle;
-		org_pivot = pivot;
+		this->pivot.y = y - getHeight();
+		org_pivot = pivot;	
 		pivot.x = 0;
 	}
 	
@@ -132,11 +110,11 @@ public:
 	
 	int getHeight() {
 	
-		return this->height;
+		return this->body.size();
 	}
 	int getWidth() {
 	
-		return this->width;
+		return this->body[0].size();
 	}
 
 	bool onRightPos() {
@@ -156,17 +134,23 @@ public:
 		start = true;
 	}
 
+	void Crouch() {
+	
+		if (this->state_code != JUMP_STATE && abs(pivot.y - org_pivot.y) <= 3) {
+		
+			setStateCode(CROUCH_STATE);
+		}
+	}
+
 	void Jump() {
 
-
 		if (this->state_code == JUMP_STATE)
-			jump_height = org_pivot.y - height * 2;
+			jump_height = org_pivot.y - getHeight() * 2;
 		else if (this->state_code != FALL_STATE && this->state_code != JUMP_STATE) 
-			setStateCode(JUMP_STATE), on_space = 0, jump_height = org_pivot.y - height * 1.4;
-
+			setStateCode(JUMP_STATE), on_space = 0, jump_height = org_pivot.y - getHeight() * 1.4;
 	}
 	
-	void Rise() {
+	void riseIfNecessary() {
 
 		if (this->state_code == JUMP_STATE) {
 		
@@ -180,14 +164,14 @@ public:
 		}
 	}
 	
-	void Fall() {
+	void fallIfNecessary() {
 	
-		if (this->state_code == FALL_STATE) {
+		if (this->state_code == FALL_STATE || this->state_code == CROUCH_STATE) {
 		
 			if (pivot.y >= org_pivot.y) {
 			
 				pivot.y = org_pivot.y;
-				this->state_code = RUN1_STATE;
+				if (this->state_code == FALL_STATE) this->state_code = RUN1_STATE;
 			}
 			else pivot.y++;
 		}
@@ -209,22 +193,12 @@ public:
 	
 		this->state_code = code;
 
-		if (state_code == IDLE_STATE) body = body_idle;
-		if (state_code == JUMP_STATE) body = body_idle;
-		if (state_code == FALL_STATE) body = body_idle;
-		if (state_code == RUN1_STATE) body = body_run1;
-		if (state_code == RUN2_STATE) body = body_run2;
-	}
-
-	void Draw() {
-	
-		for (int i = 0; i < height; i++) {
-	
-			for (int j = 0; j < width; j++) {
-			
-				mvaddch(pivot.y + i, pivot.x + j, body[i][j]);
-			}
-		}
+		if (state_code == IDLE_STATE)   body = body_idle;
+		if (state_code == JUMP_STATE)   body = body_idle;
+		if (state_code == FALL_STATE)   body = body_idle;
+		if (state_code == RUN1_STATE)   body = body_run1;
+		if (state_code == RUN2_STATE)   body = body_run2;
+		if (state_code == CROUCH_STATE) body = body_crouch;
 	}
 
 	vector<vector<char>> getBody() {
@@ -239,13 +213,11 @@ private:
 	vector<vector<char>> body;
 	string asset_file;
 	Coord pivot;
-	int height, width;
 	int map_height, map_width;
 
 	void readAssetFile() {
 	
-		AssetReader assetReader;
-		assetReader.readFileWithUnknownSize(body, asset_file, height, width);
+		readFileWithUnknownSize(body, asset_file);
 	}
 
 public:
@@ -258,7 +230,7 @@ public:
 		this->asset_file = asset_file;
 		this->pivot.x = org_x;
 		readAssetFile();
-		this->pivot.y = map_height - height - 3;
+		this->pivot.y = map_height - getHeight() - 3;
 	}
 	
 	string getAssetFileName() {
@@ -280,16 +252,16 @@ public:
 
 	int getHeight() {
 	
-		return this->height;
+		return this->body.size();
 	}
 	int getWidth() {
 	
-		return this->width;
+		return this->body[0].size();
 	}
 	bool Move() {
 
 		pivot.x--;
-		if (pivot.x + width - 1 <= 0) return true;
+		if (pivot.x + getWidth() - 1 <= 0) return true;
 		return false;
 	}
 	bool insideMap(int i, int j) {
@@ -442,10 +414,7 @@ public:
 			}
 		}
 		
-		if (beat % 8 == 0) dino->toggleStep();
-		if (beat % 2 == 0) dino->Rise();
-		if (beat % 2 == 0) dino->Fall();
-		
+				
 		if (difftime(t_now, t_start) + 1 >= 15) {
 			difficult++;
 			difficult = min(8, difficult);
@@ -454,10 +423,15 @@ public:
 	
 		char key = getch();
 		if (key == ' ' && !dino->start) dino->Jump();
+		else if (key == 's') dino->Crouch(); 
 		else if (key == 'q') isExit = true;
 
 		if (dino->start && dino->onRightPos()) 
 			land->makeAllLayer(), dino->start = false;;
+		
+		if (beat % 8 == 0) dino->toggleStep();
+		if (beat % 2 == 0) dino->riseIfNecessary();
+		if (beat % 2 == 0) dino->fallIfNecessary();
 
 		beat++;
 		dino->setMaxOnSpace(2 + min(6, difficult));
@@ -511,20 +485,20 @@ public:
 				mvaddch(i, j, map[i][j]);
 			}
 		}
-		mvprintw(1, map_width - 15, "HI:   %d           ", highscore);
+		mvprintw(1, map_width - 15, "HIGH: %d           ", highscore);
 		mvprintw(2, map_width - 15, "CURR: %d           ", beat / 5);
 	}
 
 	void Init() {
 		
-		dino = new Dinosaur(map_height - Dinosaur::height - 3, 10);
+		dino = new Dinosaur(map_height - 3, 10);
 	
 		obs_list.clear();
 		for (int i = 0; i < 20; i++) {
 
 			string asset;
 			int type = rand() % 4 + 1;
-			obs_list.push_back(new Obstacle("cactus" + to_string(type) + ".txt", map_height, map_width, map_width + 100 + 100 * i - rand() % 25));
+			obs_list.push_back(new Obstacle("cactus" + to_string(type) + ".ast", map_height, map_width, map_width + 100 + 100 * i - rand() % 25));
 			mvprintw(i, 0, "%d     ", obs_list[i]->getPivot().x);
 		}
 
@@ -532,7 +506,7 @@ public:
 		beat = 0;
 		isGameOver = false;
 
-		ifstream in; in.open("highscore.txt");
+		ifstream in; in.open("highscore.dat");
 		in >> highscore;
 
 		Render();
@@ -569,7 +543,7 @@ public:
 			mvaddstr(map_height / 2 - 3, map_width / 2 - 6, "GAME OVER");
 			mvaddstr(map_height / 2 - 2, map_width / 2 - 12, "Press space to replay");
 			mvaddstr(map_height / 2 - 1, map_width / 2 - 9,  "Press Q to quit");
-			ofstream out; out.open("highscore.txt");
+			ofstream out; out.open("highscore.dat");
 			out << highscore;
 			char key;
 			while (true) {
