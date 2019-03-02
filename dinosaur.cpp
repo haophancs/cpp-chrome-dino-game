@@ -70,6 +70,7 @@ private:
 	int on_space = 0;
 	int max_on_space = 2;
 	int jump_height;
+	int fall_speed = 1;
 	bool crouchable = false;
 
 	void readAssetFile() {
@@ -128,6 +129,11 @@ public:
 		this->max_on_space = t;
 	}
 
+	void setFallSpeed(int speed) {
+
+		this->fall_speed = speed;
+	}
+
 	void Start() {
 	
 		Jump();
@@ -153,16 +159,23 @@ public:
 	
 	void riseIfNecessary() {
 
-		if (this->state_code == JUMP_STATE) {
-		
+		if (fall_speed == 2) startFalling();
+		else if (this->state_code == JUMP_STATE) {
+			
 			if (pivot.y <= jump_height) {
 			
 				pivot.y = jump_height;
-				if (on_space == max_on_space) this->state_code = FALL_STATE, on_space = 0;
+				if (on_space == max_on_space) startFalling();
 				else on_space++;
 			}
 			else pivot.y--;
 		}
+	}
+
+	void startFalling() {
+	
+		setStateCode(FALL_STATE);
+		on_space = 0;
 	}
 	
 	void fallIfNecessary() {
@@ -172,9 +185,11 @@ public:
 			if (pivot.y >= org_pivot.y) {
 			
 				pivot.y = org_pivot.y;
-				if (this->state_code == FALL_STATE) setStateCode(RUN1_STATE);
+				if (this->state_code == FALL_STATE) 
+					setStateCode((fall_speed == 2 && crouchable)? CROUCH_STATE: RUN1_STATE);
+				setFallSpeed(1);
 			}
-			else pivot.y++;
+			else pivot.y += fall_speed;
 		}
 		if ((state_code == RUN1_STATE || state_code == RUN2_STATE) && pivot.x < org_pivot.x) pivot.x++;
 		if (pivot.x == org_pivot.x) crouchable = true;
@@ -336,7 +351,7 @@ public:
 
 	void Draw() {
 	
-		mvaddstr(pos_line, 0, const_cast<char *>(layer0.c_str()));
+		mvaddstr(pos_line,     0, const_cast<char *>(layer0.c_str()));
 		mvaddstr(pos_line + 1, 0, const_cast<char *>(layer1.c_str()));
 		mvaddstr(pos_line + 2, 0, const_cast<char *>(layer2.c_str()));
 	}
@@ -416,7 +431,6 @@ public:
 			}
 		}
 		
-				
 		if (difftime(t_now, t_start) + 1 >= 15) {
 			difficult++;
 			difficult = min(8, difficult);
@@ -424,11 +438,15 @@ public:
 		}
 	
 		char key = getch();
-		if (key == ' ' && !dino->start) dino->Jump();
-		else if (key == 's') {
+		if (key == 's') {
 			
-			dino->Crouch(); 
+			if (dino->getStateCode() == Dinosaur::FALL_STATE || dino->getStateCode() == Dinosaur::JUMP_STATE) {
+				dino->setFallSpeed(2);
+			}
+			else if (dino->getStateCode() == Dinosaur::CROUCH_STATE) dino->setStateCode(Dinosaur::RUN1_STATE);
+			else dino->Crouch();
 		}
+		else if (key == ' ' && !dino->start) dino->Jump();
 		else if (key == 'q') isExit = true;
 
 		if (dino->start && dino->onRightPos()) 
@@ -558,6 +576,8 @@ public:
 				if (key == ' ') break;
 				else if (key == 'q') goto Exit;
 			}
+			delete dino;
+			for (Obstacle *obs: obs_list) delete obs;
 		}
 Exit: { }
 	}
@@ -570,8 +590,8 @@ int main() {
 	curs_set(0);
 	keypad(stdscr, 1);
 	cbreak();
-    noecho();
-    scrollok(stdscr, TRUE);
+	noecho();
+	scrollok(stdscr, TRUE);
    	nodelay(stdscr, TRUE);
 	
 	GameManager gameManager(50, 200);
