@@ -70,6 +70,7 @@ private:
 	int on_space = 0;
 	int max_on_space = 2;
 	int jump_height;
+	bool crouchable = false;
 
 	void readAssetFile() {
 
@@ -136,7 +137,7 @@ public:
 
 	void Crouch() {
 	
-		if (this->state_code != JUMP_STATE && abs(pivot.y - org_pivot.y) <= 3) {
+		if (crouchable && this->state_code != JUMP_STATE && abs(pivot.y - org_pivot.y) <= 3) {
 		
 			setStateCode(CROUCH_STATE);
 		}
@@ -171,11 +172,12 @@ public:
 			if (pivot.y >= org_pivot.y) {
 			
 				pivot.y = org_pivot.y;
-				if (this->state_code == FALL_STATE) this->state_code = RUN1_STATE;
+				if (this->state_code == FALL_STATE) setStateCode(RUN1_STATE);
 			}
 			else pivot.y++;
 		}
 		if ((state_code == RUN1_STATE || state_code == RUN2_STATE) && pivot.x < org_pivot.x) pivot.x++;
+		if (pivot.x == org_pivot.x) crouchable = true;
 	}
 
 	void toggleStep() {
@@ -423,7 +425,10 @@ public:
 	
 		char key = getch();
 		if (key == ' ' && !dino->start) dino->Jump();
-		else if (key == 's') dino->Crouch(); 
+		else if (key == 's') {
+			
+			dino->Crouch(); 
+		}
 		else if (key == 'q') isExit = true;
 
 		if (dino->start && dino->onRightPos()) 
@@ -560,8 +565,10 @@ Exit: { }
 
 int main() {
 
-	initscr();	
+	initscr();
+	raw();
 	curs_set(0);
+	keypad(stdscr, 1);
 	cbreak();
     noecho();
     scrollok(stdscr, TRUE);
